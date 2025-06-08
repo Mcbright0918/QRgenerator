@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Password Protected QR Code Generator</title>
+  <meta name="viewport" content="width=480, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f8fa; }
+    .main { max-width:400px; margin:36px auto; background:#fff; border-radius:14px; box-shadow:0 6px 28px #0002; padding:32px;}
+    h2 { text-align:center; }
+    label { font-weight:bold; display:block; margin-top:12px;}
+    input[type="text"], input[type="password"] { width:100%;padding:9px 10px;border-radius:6px;border:1px solid #bbb;margin:7px 0 12px 0;}
+    button {background:#267a32;color:#fff;border:none;padding:11px 24px;font-size:18px;border-radius:7px;cursor:pointer;}
+    button:hover {background:#135b1b;}
+    #qrcode {margin:24px auto;display:flex;justify-content:center;}
+    .note {font-size:13px;color:#777;margin-bottom:18px;}
+    #qr-result {font-size:14px;margin-bottom:15px;}
+    .footer {text-align:center;color:#aaa;font-size:12px;margin-top:40px;}
+    #pwPrompt { display:none; }
+  </style>
+</head>
+<body>
+<div class="main" id="mainGen">
+  <h2>Password Protected QR Generator</h2>
+  <label>URL to protect:</label>
+  <input type="text" id="link" placeholder="https://example.com" autocomplete="off">
+  <label>Password for access:</label>
+  <input type="password" id="pw" placeholder="Set a password" autocomplete="off">
+  <div class="note">The QR will lead to a password prompt before redirecting.</div>
+  <button onclick="generateQR()">Generate QR Code</button>
+  <div id="qrcode"></div>
+  <div id="qr-result"></div>
+</div>
+
+<!-- Password Prompt Page -->
+<div class="main" id="pwPrompt">
+  <h2>Password Required</h2>
+  <div id="pwMsg" style="color:#c33;"></div>
+  <input type="password" id="pwTry" placeholder="Enter password">
+  <button onclick="checkPassword()">Unlock</button>
+</div>
+
+<div class="footer">Made for you • ChatGPT Demo</div>
+
+<script>
+function xorEncrypt(str, key) {
+  return btoa([...str].map((c,i)=>String.fromCharCode(c.charCodeAt(0)^key.charCodeAt(i%key.length))).join(''));
+}
+function xorDecrypt(data, key) {
+  try {
+    return atob(data).split('').map((c,i)=>String.fromCharCode(c.charCodeAt(0)^key.charCodeAt(i%key.length))).join('');
+  } catch {
+    return "";
+  }
+}
+// Generator mode
+function generateQR() {
+  let link = document.getElementById('link').value.trim();
+  let pw = document.getElementById('pw').value;
+  if (!/^https?:\/\//i.test(link)) return alert("Enter a valid link starting with http:// or https://");
+  if (!pw) return alert("Enter a password!");
+  let cipher = xorEncrypt(link, pw);
+  // Compose self-link (your own page with ?q=)
+  let url = location.origin + location.pathname + "?q=" + encodeURIComponent(cipher);
+  document.getElementById('qrcode').innerHTML = "";
+  QRCode.toCanvas(document.createElement('canvas'), url, {width:220}, (err, canvas) => {
+    if (!err) {
+      document.getElementById('qrcode').appendChild(canvas);
+    }
+  });
+  document.getElementById('qr-result').innerHTML = `<b>QR Link:</b> <br><a href="${url}" target="_blank">${url}</a>`;
+}
+// If someone scans the QR, show password prompt page
+if (new URLSearchParams(location.search).get("q")) {
+  document.getElementById("mainGen").style.display = "none";
+  document.getElementById("pwPrompt").style.display = "block";
+}
+function checkPassword() {
+  let pwTry = document.getElementById("pwTry").value;
+  let q = new URLSearchParams(location.search).get("q");
+  let link = xorDecrypt(q, pwTry);
+  if (/^https?:\/\//i.test(link)) {
+    document.getElementById("pwMsg").style.color="#28a745";
+    document.getElementById("pwMsg").textContent = "Unlocked! Redirecting…";
+    setTimeout(()=>{ location.href=link },800);
+  } else {
+    document.getElementById("pwMsg").textContent = "Wrong password!";
+    document.getElementById("pwMsg").style.color="#c33";
+  }
+}
+</script>
+</body>
+</html>
